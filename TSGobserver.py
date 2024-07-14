@@ -1,7 +1,9 @@
 import psutil
 import time
 import threading
-from tkinter import Tk, Label, Button, StringVar
+from tkinter import Tk, Label, Button, StringVar, messagebox
+import requests
+import os
 
 # Список программ для выключения
 PROGRAMS_TO_TERMINATE = {
@@ -25,10 +27,6 @@ PROGRAMS_TO_CHECK = {
 monitoring_event = threading.Event()
 
 def terminate_programs_and_check_running(program_list, check_list):
-    """
-    Завершает процессы из program_list и проверяет, запущены ли процессы из check_list.
-    Возвращает набор запущенных процессов из check_list.
-    """
     running_programs = set()
     for process in psutil.process_iter(['pid', 'name']):
         try:
@@ -56,9 +54,6 @@ def terminate_programs_and_check_running(program_list, check_list):
     return running_programs
 
 def monitor_program():
-    """
-    Функция для мониторинга и завершения процессов.
-    """
     while not monitoring_event.is_set():
         running_programs = terminate_programs_and_check_running(PROGRAMS_TO_TERMINATE, PROGRAMS_TO_CHECK)
         if PROGRAMS_TO_CHECK.issubset(running_programs):
@@ -70,39 +65,51 @@ def monitor_program():
         time.sleep(5)
 
 def update_status(message):
-    """
-    Обновляет статусное сообщение в UI, если оно изменилось.
-    """
     if status_var.get() != message:
         status_var.set(message)
 
 def start_monitoring():
-    """
-    Запускает поток мониторинга.
-    """
     monitor_thread = threading.Thread(target=monitor_program)
     monitor_thread.daemon = True
     monitor_thread.start()
 
 def stop_monitoring():
-    """
-    Останавливает мониторинг и закрывает приложение.
-    """
     monitoring_event.set()
     root.destroy()
 
 def on_closing():
-    """
-    Обработчик закрытия окна.
-    """
     stop_monitoring()
 
 def open_link(event):
-    """
-    Открывает ссылку в браузере.
-    """
     import webbrowser
     webbrowser.open_new("https://tsgames.ru/user/profile/Mongren")
+
+def get_latest_version():
+    url = 'https://raw.githubusercontent.com/Ddementef/TSGobserver/main/version.txt'  # Замените на URL вашего файла с версией
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.text.strip()
+    else:
+        return None
+
+def download_latest_version():
+    url = 'https://github.com/Ddementef/TSGobserver/releases/latest/download/TSGobserver.exe'  # Замените на URL вашего .exe файла
+    response = requests.get(url)
+    with open('TSGobserver_latest.exe', 'wb') as file:
+        file.write(response.content)
+
+def check_for_updates():
+    current_version = '1.0.1'  # Текущая версия вашего приложения
+    latest_version = get_latest_version()
+    
+    if latest_version and latest_version != current_version:
+        result = messagebox.askyesno("Обновление доступно", f"Обнаружена новая версия: {latest_version}. Обновить сейчас?")
+        if result:
+            download_latest_version()
+            os.remove('TSGobserver.exe')
+            os.rename('TSGobserver_latest.exe', 'TSGobserver.exe')
+            messagebox.showinfo("Обновление завершено", "Приложение обновлено до последней версии. Перезапустите его.")
+            stop_monitoring()
 
 # Окно приложения
 root = Tk()
@@ -124,6 +131,9 @@ stop_button.pack(pady=10)
 
 # Добавляем обработчик для закрытия окна
 root.protocol("WM_DELETE_WINDOW", on_closing)
+
+# Проверка обновлений при запуске
+check_for_updates()
 
 # Мониторинг при запуске приложения
 start_monitoring()

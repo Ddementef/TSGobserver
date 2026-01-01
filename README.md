@@ -46,7 +46,7 @@
    - Одноклассники
    - Viber
    - GOG GALAXY
-   - Viber Teams / Microsoft Teams
+   - Microsoft Teams
    - Slack
    - OMEN Gaming Hub
 

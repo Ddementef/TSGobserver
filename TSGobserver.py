@@ -41,7 +41,7 @@ PROGRAMS_TO_TERMINATE = {
     "Odnoklassniki.exe",  # Одноклассники
     "Viber.exe",  # Viber
     "GalaxyClient.exe",  # GOG GALAXY
-    "Teams.exe",  # Viber Teams / Microsoft Teams
+    "Teams.exe",  #Microsoft Teams
     "slack.exe",  # Slack
     "OMEN Gaming Hub.exe",  # OMEN Gaming Hub
     "OMENCommandCenter.exe"  # OMEN Gaming Hub (альтернативное имя)
@@ -67,7 +67,7 @@ PROGRAM_DISPLAY_NAMES: Dict[str, str] = {
     "Odnoklassniki.exe": "Одноклассники",
     "Viber.exe": "Viber",
     "GalaxyClient.exe": "GOG GALAXY",
-    "Teams.exe": "Viber Teams",
+    "Teams.exe": "Teams",
     "slack.exe": "Slack",
     "OMEN Gaming Hub.exe": "OMEN Gaming Hub",
     "OMENCommandCenter.exe": "OMEN Gaming Hub"

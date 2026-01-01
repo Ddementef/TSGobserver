@@ -70,9 +70,9 @@
 
 После установки зависимостей запустите программу:
 
-
+```bash
 python TSGobserver.py
-
+```
 
 ## Сборка exe-файла
 
@@ -82,17 +82,17 @@ python TSGobserver.py
 
 Сначала установите PyInstaller:
 
-
+```bash
 pip install pyinstaller
-
+```
 
 ### Сборка exe
 
 Выполните команду:
 
-
+```bash
 pyinstaller --onefile --windowed --name TSGobserver --icon=SG.ico TSGobserver.py
-
+```
 
 Параметры:
 - `--onefile` - создает один исполняемый файл

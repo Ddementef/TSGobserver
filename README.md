@@ -44,6 +44,11 @@
    - VK
    - Facebook
    - Одноклассники
+   - Viber
+   - GOG GALAXY
+   - Viber Teams / Microsoft Teams
+   - Slack
+   - OMEN Gaming Hub
 
 3. **Интерфейс**: Программа имеет графический интерфейс, который показывает:
    - Текущий статус мониторинга

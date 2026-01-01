@@ -38,7 +38,13 @@ PROGRAMS_TO_TERMINATE = {
     "VKPlay.exe",  # VK Play
     "VK.exe",  # VK
     "Facebook.exe",  # Facebook
-    "Odnoklassniki.exe"  # Одноклассники
+    "Odnoklassniki.exe",  # Одноклассники
+    "Viber.exe",  # Viber
+    "GalaxyClient.exe",  # GOG GALAXY
+    "Teams.exe",  # Viber Teams / Microsoft Teams
+    "slack.exe",  # Slack
+    "OMEN Gaming Hub.exe",  # OMEN Gaming Hub
+    "OMENCommandCenter.exe"  # OMEN Gaming Hub (альтернативное имя)
 }
 
 # Словарь соответствия имен процессов и отображаемых названий
@@ -58,7 +64,13 @@ PROGRAM_DISPLAY_NAMES: Dict[str, str] = {
     "VKPlay.exe": "VK Play",
     "VK.exe": "VK",
     "Facebook.exe": "Facebook",
-    "Odnoklassniki.exe": "Одноклассники"
+    "Odnoklassniki.exe": "Одноклассники",
+    "Viber.exe": "Viber",
+    "GalaxyClient.exe": "GOG GALAXY",
+    "Teams.exe": "Viber Teams",
+    "slack.exe": "Slack",
+    "OMEN Gaming Hub.exe": "OMEN Gaming Hub",
+    "OMENCommandCenter.exe": "OMEN Gaming Hub"
 }
 
 # Список программ, которые нужно проверять на запуск
@@ -249,6 +261,29 @@ def update_status(message: str) -> None:
     root.after(0, update)
 
 
+def format_apps_list(apps: list, first_line_max: int = 2, other_lines_max: int = 3) -> str:
+    """
+    Форматирует список приложений с переносами строк.
+    """
+    if not apps:
+        return ""
+    
+    lines = []
+    
+    # Первая строка - максимум first_line_max приложений
+    if len(apps) > 0:
+        first_line_apps = apps[:first_line_max]
+        lines.append(", ".join(first_line_apps))
+        remaining_apps = apps[first_line_max:]
+        
+        # Остальные строки - по other_lines_max приложений
+        for i in range(0, len(remaining_apps), other_lines_max):
+            line_apps = remaining_apps[i:i + other_lines_max]
+            lines.append(", ".join(line_apps))
+    
+    return "\n".join(lines)
+
+
 def update_detected_apps(detected_apps: Set[str], all_target_running: bool) -> None:
     """
     Безопасно обновляет список обнаруженных приложений в UI из любого потока.
@@ -270,7 +305,22 @@ def update_detected_apps(detected_apps: Set[str], all_target_running: bool) -> N
         if all_target_running and detected_apps:
             # Преобразуем имена процессов в отображаемые имена
             display_names = sorted([get_display_name(name) for name in detected_apps])
-            apps_list = ", ".join(display_names)
+            # Первая строка с текстом содержит максимум 2 приложения, далее по 3
+            first_line_apps = display_names[:2]
+            remaining_apps = display_names[2:]
+            
+            if remaining_apps:
+                # Если есть приложения после первых двух, форматируем остальные по 3 на строку
+                first_line = ", ".join(first_line_apps)
+                other_lines = []
+                for i in range(0, len(remaining_apps), 3):
+                    line_apps = remaining_apps[i:i + 3]
+                    other_lines.append(", ".join(line_apps))
+                apps_list = f"{first_line}\n" + "\n".join(other_lines)
+            else:
+                # Если приложений 2 или меньше, все в одной строке
+                apps_list = ", ".join(first_line_apps)
+            
             text = f"Закрываются приложения: {apps_list}"
             detected_apps_var.set(text)
             if detected_apps_label:
@@ -278,7 +328,22 @@ def update_detected_apps(detected_apps: Set[str], all_target_running: bool) -> N
         elif detected_apps:
             # Преобразуем имена процессов в отображаемые имена
             display_names = sorted([get_display_name(name) for name in detected_apps])
-            apps_list = ", ".join(display_names)
+            # Первая строка с текстом содержит максимум 2 приложения, далее по 3
+            first_line_apps = display_names[:2]
+            remaining_apps = display_names[2:]
+            
+            if remaining_apps:
+                # Если есть приложения после первых двух, форматируем остальные по 3 на строку
+                first_line = ", ".join(first_line_apps)
+                other_lines = []
+                for i in range(0, len(remaining_apps), 3):
+                    line_apps = remaining_apps[i:i + 3]
+                    other_lines.append(", ".join(line_apps))
+                apps_list = f"{first_line}\n" + "\n".join(other_lines)
+            else:
+                # Если приложений 2 или меньше, все в одной строке
+                apps_list = ", ".join(first_line_apps)
+            
             text = f"Обнаружены (закроются при запуске Arma 3): {apps_list}"
             detected_apps_var.set(text)
             if detected_apps_label:
@@ -650,9 +715,10 @@ def create_gui() -> None:
         bg=card_color,
         font=("Segoe UI", 10),
         wraplength=540,
-        justify="left"
+        justify="left",
+        anchor="nw"
     )
-    detected_apps_label.pack(anchor="w", padx=15, pady=(0, 12))
+    detected_apps_label.pack(anchor="nw", padx=15, pady=(0, 12))
     
     # Контейнер для кнопок
     button_frame = Frame(main_frame, bg=bg_color)

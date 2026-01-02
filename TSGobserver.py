@@ -6,6 +6,7 @@ import base64
 import tempfile
 import os
 import sys
+import re
 from tkinter import Tk, Label, Button, StringVar, Frame, Toplevel, Text, Scrollbar, messagebox
 from typing import Set, Optional, Tuple, Dict, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -156,17 +157,67 @@ def get_app_name() -> str:
 def is_in_autostart() -> bool:
     """
     Проверяет, добавлено ли приложение в автозапуск Windows.
+    Также проверяет корректность пути к исполняемому файлу.
     
     Returns:
-        True если приложение в автозапуске, False в противном случае
+        True если приложение в автозапуске и путь корректен, False в противном случае
     """
     try:
         startup_folder = get_startup_folder()
         app_name = get_app_name()
-        # Проверяем наличие .bat или .vbs файла
         bat_path = os.path.join(startup_folder, f"{app_name}.bat")
         vbs_path = os.path.join(startup_folder, f"{app_name}.vbs")
-        return os.path.exists(bat_path) or os.path.exists(vbs_path)
+        
+        # Проверяем .bat файл
+        if os.path.exists(bat_path):
+            try:
+                with open(bat_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # Ищем путь в формате: start "" "путь"
+                # Регулярное выражение для поиска пути в кавычках после start ""
+                match = re.search(r'start\s+""\s+"([^"]+)"', content)
+                if match:
+                    exe_path = match.group(1)
+                    # Проверяем, существует ли файл
+                    if os.path.exists(exe_path):
+                        return True
+                    else:
+                        # Путь некорректен - удаляем файл автозапуска
+                        try:
+                            os.remove(bat_path)
+                        except Exception:
+                            pass
+                        return False
+            except Exception:
+                # Если не удалось прочитать файл, считаем автозапуск неактивным
+                return False
+        
+        # Проверяем .vbs файл
+        if os.path.exists(vbs_path):
+            try:
+                with open(vbs_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # Ищем путь к Python скрипту в формате: WshShell.Run """python_exe"" ""script_path"""
+                # Регулярное выражение для поиска путей (формат: """путь1"" ""путь2""")
+                match = re.search(r'WshShell\.Run\s+"""(.*?)""\s+""(.*?)"""', content)
+                if match:
+                    python_exe = match.group(1)
+                    script_path = match.group(2)
+                    # Проверяем, существуют ли оба файла
+                    if os.path.exists(python_exe) and os.path.exists(script_path):
+                        return True
+                    else:
+                        # Путь некорректен - удаляем файл автозапуска
+                        try:
+                            os.remove(vbs_path)
+                        except Exception:
+                            pass
+                        return False
+            except Exception:
+                # Если не удалось прочитать файл, считаем автозапуск неактивным
+                return False
+        
+        return False
     except Exception:
         return False
 

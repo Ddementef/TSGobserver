@@ -2,19 +2,12 @@ import psutil
 import time
 import threading
 import webbrowser
-import base64
-import tempfile
 import os
 import sys
 import re
 from tkinter import Tk, Label, Button, StringVar, Frame, Toplevel, Text, Scrollbar, messagebox
 from typing import Set, Optional, Tuple, Dict, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
-try:
-    from PIL import Image
-    PIL_AVAILABLE = True
-except ImportError:
-    PIL_AVAILABLE = False
 try:
     import requests
     REQUESTS_AVAILABLE = True
@@ -29,13 +22,11 @@ KILL_AFTER_TERMINATE = True  # Использовать kill() если terminat
 CACHE_TTL = 2  # Время жизни кэша процессов в секундах
 
 # Версия приложения
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 
 # URL репозитория GitHub в формате: owner/repo
 GITHUB_REPO = "Ddementef/TSGobserver"
 
-# Встроенная иконка приложения (base64)
-ICON_BASE64 = """iVBORw0KGgoAAAANSUhEUgAAAOQAAADkCAYAAACIV4iNAAAedElEQVR4nO2dB3hVxdaGXxIQQyhCgAih9ya9SpMiVentckEEFRVRftFrQa+ioigKKtdCFQS5KiJFkQ4XlKIoJCJdBKQJoXdp4X+GvaMhpJ1z9uxyznqfJw+Iyczae58vM3tmzbcyXd2J0xQBqgGVgFJAMSAaiAIigByORygEE6eB88BR4BCwG9gBbARigT1OXqsTglRCa2V+NQFibI9AEFJnP7AcmA8sMIVrG3YJUo10nYBeQDMgi3wgBA9wCVgGTAVmmiOrVnQLsjDwGHAfkFs+gYKHOQFMAEYDe3Vdhi5BKiE+B/QFbtLSgyA4w0VgMjBMhzCtFmQk8Cww2JymCkKwoqavo4DXgTNWXaOVglSLNB+aq6SCECqoVdqHzQWggAmzoI1swFhzVUrEKIQaxczP/jhTCwER6AhZDphl/ikIoc5WoKP5p18EMkLeDawVMQrCX5QzNXG3v7fEX0EOMEdGyaIRhOvJYWpjgD/3xR9BPgO8D4TLgxCEFAk3NfKsr7fHV0GqDobLMxCEDPGauR+fYXwR5MNmB4IgZJxhpnYyREZXWduZuXwyTRUE37li5nJ/ld5PZkSQauXoByCnPAhB8JtTQF1gS1oNpDdljTRXjESMghAYOc1ZZmRaraQnyFGyzygIllHO1FSqpDVlbQ4slmchCJZzJ7AkpUZTE2RW4GegrDwLQbCc7UBl4ELyhlObsj4pYhQEbZQxNXYDKY2QhYBtVmSuC4KQKufMQW9f0m9IaYR8XsQoCNrJZmrtOpKPkIVNSzyx3RAE/Sg7kNJJrSeTj5CPiRgFwTaU1h5N2lnSETLC9KQUdzhBsI/jpjfxNYvJpCNkZxGjINhOblN710gqyF7yLATBEXondpo4Zc0LHBBHcUFwhMtAAeBI4gjZQsQoCI6RGWhJkilrG3kWguAorUkiyEbyLATBURpjCrKw+SUIgnOolNUiYWaxVEEQnKdqmFm5WBAE56kSZh4FEQTBeUqFSYEcQXANRZUg88jzEARXEB0mjnKC4BqiwqRgjiC4hgglyOzyPATBFWQPkwPJguAerChpLgiCRYggBcFFiCAFwUWIIAXBRYggBcFFiCAFwUVkDqaHcfkUbNsN23fD3oOw7yDsj4cjx+DoSTh+Ei5fgbPn4dyff/9c1C0Qlgny5oYckZD3FsgfBYWiISYaSheF8iUh961OXp0QCiiTq6uevM6LsO5nWLYWfoiDVbFw8JjeLrOEQ5WyUL081KsKDapDqbIyzxCsw1OCPHEIZi2G6Qth0RpISHA+puxZ4a6m0Lk5tG8KWXI5H5PgXdwvyD9h5kIY+zks+t4F8aRBJqBjU+jfDVo2A8JdG6rgUlwryLNH4d0p8PoEOH3eBQH5SJFoeO4huL8LhKVZVV4Q/sZ1gkw4C6+Pg6EfwKUrLggoQCJugjefhEf6iPOtkD6uEuRX30DfIXDstAuCsZgSBWHSa9BIDDeFNHCFIM8dg55PwpzlTkein15tYdKrkFmOhQsp4Lgg1/0IrR6EIydC5/EUyg9LP4IyFVwQjOAqHN1B+3I21OoRWmJU7IuHCu1g8RIXBCO4CscEOXYydBkMV72ZlhAwVxKgRX/4bIbHL0SwFEcEOXEKPPSyPEjFP56C/053QSCCK7D9HXLJErizvzz85CweB82buysmwX5sFeSeHVCilTFdE64nPAy2zYWS5eTGhDL2TVkvQNuHRYypoe7LnfepPSB3xifYg22CfGk0bPxNnmpa7PoDBg13b3yCfmyZsv6+A4q3wKPnvOxn5RSo3yDUrlrArhHy0VdFjL5wzzPAJe/EK1iHdseAuPXw9QrnnljWLFCpFBSPgQL5IXcOiIw0/l1x8rThIBB/zHAY2PIb7D/iXLyKnQdg/KfwwD3OxiHYj/Ypa+f7YeYy+66rQBR0bw3N60LdqhBV0Pc21ImTHzfC0tUwYxHEbtMRadooG5HD34uvfKihVZAH90CBO/Tf0UyZoF97GNgLqla3vv1d2+GtSfDhdHszi2a+Ax3b2def4Dxa3yE/+lL/9d3bHg6tgAmj9IhRUbwMvD8c9i+DZrX19JES7061ry/BHWgdIUs2MN6HdJAnB8x5Dxo0tPk+XoXX/wPPvmNPd3uXQKES9vQlOI+2EfLQXn1iVPYY2+c7IEYM45xnHoOJL9nT3RcL7elHcAfaBLlolZ52VYrZd1P9W6yxkn694am++vuZvdTGixIcR5sg18TpafeVgVCklJ62feWNZ6BKGb19fLcergShpYmQMtoEuW6TnnYHuWlvLgt8NExvF+oFX5lAC6GBNkEqO3+rqV4OsuVx13OpXhPubqy3j58d2AcVnEGPIC/AibPWN1vepauNzz+st/3YLXrbF9yDFkH+qcnY+GaXZq3UrmWs/OoidrPDFyjYhpZc1rOazvTFH9fTbsBkgvs6w4sf6Gn+d03bR9pJgPj9sHOfkSd8/gIcO2l8PjJngVzZIWekUX2sbHEoWizY6rH5jpbEgKMHIK+G40O5ssGJDe6sNhUXC9U662v/6k59bVvGn/B9LCxdAwtXwZoNRvm/jKJSICuWgPrVoE1jaNMw9PxrtQjy/HHIVsPqVg2+nQwN3ej+fRnCy+mryHV+Pdx8i562AyIBVq8x0iSnfG1t+Qcl0A5NYGBPaHqHb7+IVW2YTo9aeqUsnABks7bN5OhJnUuATJr2CtVv0I3z3Vkno157+P6X9L9PvQurmh+qOGzuXBCR1Zi6qf+OuNmYykVmM/5d/f+bsxoVtTJp/jD4xDkY8zkM+9Ce42qqFMPwwdCtQ8aEqWOWdvlnCM9hbZvJ0ZbLWqCmvgKqQx6AV5/V03YgxK6DA4cgeyTcbAorW1ZDULlzQpasSo3ui9snEmDK5zD4DTh6yv7ua5SHj4dDxcppf58IMhmte8MCTelzireegCce0de+cCPKiuWfT8EqTVlYvvBIdxj9fOql/rwqSG3LI5U0p7c9ORK69jcK9QiauQrvjIHiLd0hRsX7n0PplvBrkG0JaROkqsGvmxlLIOp2GPm+ccpfsJ6r56DbQ/D4CPeVfVCniSq0h3nzXRCMRWgTZEubXNP+vGiMlhHVYMhrhkuBYA2H90GFtvDFYvfeULWt0vYRmPSJC4KxAG2CjIzSfxIiKRcvw/AJhmXIHV3hk8/gjMNmVV7mj9+hSkfY+rs3LqLfC/DhRy4IJEC0brH3aW/HJdzIinXQewjkqA23t4d3x8L+Xc7E4kX27YTKHeGPo94KfsAw+Pi/LggkALRaeJw+DLnquMeTtXQR6N4SWtSHhrWACBcE5TJOxUOZ1nDIrWmKGUAVLqpWQbY9UqTHw/C5C20oVBbIHTWgRQNoUgfqVBaBqlM6dbvCDxtdEEsAZAmHReOhST9r2w0KQapl6TJ36ezBGjKpleHKxuipBNqwpssyY2yg7+MweU5wXIvKez5p8SGHoBCkos8gI8/Ra9S9DVrcbgi0Ua3UN6GDAVXJWRWPFVInaASpls/V6qfXS9HVqQQdmkO7JlChkjmsBgHHD0J0Q2sTw4ORoBGkYvwU6D/Ujp7sQfnCdmtliLNVI29Pb7s/BNMXOdN3ofxQrjjkzWMk3at95cNHYetO52usJCeoBKl6adULFq6xpTdbUQtEretD347QuaW3xLnuR6jZ3b7+1L3qfRf8ow00qwtZcqX+vRdPwLIf4LP5MHWuvqNtGSW4BKmW1A9BmTbeXlJPD+Ub+8+2cG8HaNLQ/SfgG3SyJz9VCVH52L4wwD+jsksnYfh4GDbWual10AlSsXMbVGgHF0Kg/uEtkTCgJwzqBfkLuyCgZKxdC3V66O+nahmY9R8oVjrwto7shx5PwNK1VkTmG54+7ZEaJcoae0SZgmRBJC2U895r4yG6sXEyZXMGDi/bySuaPICS0qcdxH5ljRgVeWNgyX/hlSA9emf7CJnI4iXQ8kH3nSDQzV2NYPQQo6KWk6iRJp/m2igPd4MPhutbjbZ7oTAoR8hE7mxu1NJXWRWhxNxvoUQrGPgsXHbgxH0i47/Q236X5vDBq3q3hlSF6beDbO/UsREykR1boElf2BfvZBTOEJUTpo+Cpk3t7750I9ixT0/bJWNgx0L9hlDXuAo9BtiTnhnUI2QipcrDrkXQs43TkdiP8qRpdj889bLhWmcXamFNlxgVM0bbJEaMEXjaCGNfOBhwhcOp8t6c9h4sHGvU1g813pwMTXoa+2528NX/9HWiFnGqVrP3AapR68MX7e1TF66yHG5xJ8SvhGEDQ+/dcvlPUKkDnDikv6+5y/W1/dJAfW2nRbeOUK6oM31bies8wFWWy3OD4cgq+Ne9kDmEhPnrHqjcwcgt1cYl+N9Pehpv3QCKOlW7MxM896BDfVuIC035DXLmhxEvwNkf4fXHIXd2N0Sln72HoGEvfUVaN23Rl4L2YDc97WaUXu29P7NyrSATuekWePpROLYe5r4Hreq7Iy6dbNoJLR8ANKSIrd2gJ3CV6NHOgdXi64iAHq0djiFAXC/Iv8gMbdvA/KlwZKWx/2SniZbdqNSwf4+wvtP1mmpNNqrujqR6dfrGy3hHkEmIKgj/9xDELYB9Sw0X89oVXROeZQwbDz9ZnLO5QVM15qZ19LTrK3fUdkcc/uJ4YoCVKNtHtYI4awnMWwFnLnj/mgpHwx61KprVmvaiqsAxDe+nS8ZDs2bWt+sPt9bQc6IoJBIDrCR7XujRBT4fA6c3wdav4b0hRv6oV1/21SLPiPEWNXZRjxgV5UvqadcfalZyTyy+ElQjZJpcgY0bYen3sGgVLF7jHcsKdcby1Fr/zhEmRXnTFtIwiqkFnYTtKlDr2/aHp1+BEZOsb1dGSCsJh0pVYNCD8M0UuLgV4mbCqH8ZK7du3u9UXkQjLfiAHdZ0MPzWPO4Ro6JkERcE4SehI8jkhEOVqvD4w8bK7aUtEDvDWCBqWQ/CXHZe840JxpQzEA5p8qgpmF9Pu/4Sk89d8fhC6AoyOZmhanWj5uSCaXBlE3z3MTx7P1Qo7nx4Zy/AVwEWvTl5xqporic6Sk+7/hKd113x+IIIMjVuhgYN4bUhsGkpHFoBY1+Eerc5F9KU2YH9/BlNJfsiXeb4nicN4yy3I4LMIMoTp38fWD0Hdi8yDJvsXrmdrU5p/On/z5/SJMgIr5dpdxEiSD9QCdRv/BtOqmya/hBm011UizurNCWGBxO5PHw2UgQZABG54eVnYPdC+6ayK2Pt6cfLeNmnSQRpAYVLwuqZ8GhP/X2tWq+/D1/502UZUac0LV7ZgQjSKsJh9CtwXwe93cRt9f9nb8piZSR/cy6A91odeHmEdM5X+wqcOmrsje2Ph0NHYd9B+OMw7DsEB9S/HYNtC6zL49ROJpgwzMgC2qPp5L9Kpbu2H3mT7z+bTdPiy+Fjetr1l3iXxeMLlgvy6jnYf9C4KUpYSmB/xMN+9fcj8PsBQ2wZzamM22y/R0tAZIN3h0DHQfq6OHgQbvUjGyWrHyLOCPEuK32uPnNexRJBHj0ANbvA3njrS859H+cxQQIdWkP2p/SdNjly3D9BRmkyENvrMgvPAx62FLXkHTIqH+w+qKf+o0oE9xyZjTqSuvB3iphfU0bN5Sv2mHNllE073BOLr1izqJMFYjSlK81dEXgOpxNU0uhmcO68fz9XKNrqSP5mx+/62vaVWE2uCHZg2SprdU0n9tURqf95cJSMDvCoVFpc9NNUOa9GQa7brK9tn7gMP7klFj+wTJA1KugLcuKX+trWhSuPc2WG0pqOJn3nkgyinzd6u3S+ZYKsW8Wqlm7k0wXOFqbxB11nDxU5AjCTqlrWykj+ZvFqPe36ytdL3RGHv1gmyHoaBal8RN+dqq99Hfzyq762IwMQZGVN77bxJ4zCSY5y1ZuzqaRYJsic0VDsVqtauxFVzjqQkw52s+A7fR0WKeD/z9bROZOZp6/tjBAXa6z2exlLU+faNNZ3J1SlqLc1+KToQH0w/tC4WR4TwC++hjWtjOR6rs1iHCxVb0dFaN1YKkjdJrVPjzIq/7qda3YbmigSbTh0+8vNt+hzQFC/NL+Y68zD+XUzzFzmTN9WYqkgWzQwHMh0obZAuj6uXiodvWdpErsOPpuvr/3aFhzzaqWxlPlTbzowSl6Fe4fY3KcmLBWkspLvqHmUVGXbhr6ltw9/STgD3R7X24cVztwdNRoaq3e4N8boaz8lxk+F1ZpqltiN5cev+nTUfwUvjYEZs/T34xNXoMv/6a1MrGhpQbGhBnUhUuMJmmfehvU27UuqGcmDL9nTlx1YLsh2LewpHdf1Cfj0C/39ZIgr0GcwzNL8DqP8T0uVs6ChLHCv5nObzfrCH5rT6bZugno9vX3+MTnWH1DOAoP7WN5qivR8Gp4ZZm99/uSohIW2fWHK1/r76tvJOHNpBY/20hvribNQqysc2qunfTUCV+8MFxxc1dWBFseAx3rrXdxJyhsfQc32sN2B/EX1oSjWHOattKe/fha+DpStCHU1+wDtPwIV7jKmlZZxFSZ9AjW7w3kPHjpIDy2CVNWP+7TT0XLKrNsCZe+CAc/onyYpdm2Hrv2hRjfjQ2cHTWpCqfLWdvRkX/2Bq4Po1bvCKyMDT+xQtUla3wP9XgiuaWpStBXbObAbYhyqqNupKdzXGdo0tc7+Q01N5yyDMZ/Dkh+sadMX5n0ArVtZ3OgVKNpAn91IcgpEwbDH4N5OEBaZ8Z9T74ojP4IJDi/k2VFsR2v1q0H/htHTdLWePqo+R9PacGd9I6m6UmkoWCB9kV48Ab/ugS2/wY8bYflaWLvJuetQlaLj5lv3/piUL2ZBtyesbzctlMG02npp3RAql4XihYyEeeVve+YcHDgMW3fCmjiYvQy2u+SspecFef44RNVz31xfLfkrOwtl+pQtAi5eMqwDlZ3hkZOQ4LLp0PJJ0FhXWmICVGsDcds1tR9EeF6QCrU1oVZDBf+4uzF8pTmHN249VOsiDyg9gqI+5D+6QJsGunsJTlSh1gkv6780VfXLDpNnIX30GyVngs9HQR4P11twiokvG0V+7EBZVxYP4FiXYA22OJer2v+LJti3NxkMqJXiPjaOWioPef447z8jFX+Lui4IxE9sKyVQoxZ8/KpdvXmbiiVg+tv2X4JKFvhkuLfv3dTXoF5VFwTiJ7bW9ujdw6jpL6SOygNePFH/4kFq9OwGLzzozQf04kPwz+4uCCQAbC+2o2r6v/qo3b16g1zZYP2XUKCos+G+9JT+okFWo+IdGgS/7B2pfjXkcXj/OSd6di/RuSF2JhQr7YIQVdGgN+He9i6IJQP0amvEqyNxwm4cK0c34D6Y+55L/Utt5rZSsOUbKK7R7dxnwmHSSHjiHtfdrutQ2zVT3zHiDQYcrQ/Ztg1s/RrKODxFc5IHOsGGOZBbo2Of34TBW0Nh4kvuHHz+8yyMHhY8YsQNBVtLloNt82Cwy38TW416X5w9Gsa9FZhplR306w2/zNZr8+kLak/7+09h4APuiMdK3FFBOQJGDoW4mVDVTdM2TTzUFQ6uhPZ3eSfmipVh11J4up+zcahjfftXQJ069vcdbsNI7KqS5lWqQuw8mD4SShVyQUAWo/JSf5sPH75h2DF6jgh4/XnYvQg62ny0rno5+OEzmPyOg/cuAMf4jOIqQV4jDLp2hF+Xw+JxUN/Dm7yYmSP3q+v5xkgSL6GptoadFC0FMycY19S/s3FsShcqD3rVVFg3D2pb4LjnLzqvMSnaT3tYweZfYPIs+Hi2UUPCC9QoDw93h553Q0Rub8TsL1dOw5eLYfp8+Gq54Z8bCDUrQI/W0L01FCrhe0NDRxjOhFYScROc26r/XnpCkH+RAGt/gunzYN63sGW3S+IyD902rwedm0P7ZpA3xgVBOcEV2LLZKDb0yzb4eTv8utuo+3/y3PXxqKykW/NCuRJQqRTUvA3uqGVYwASCDkEWyg97v9d/PzPr78JCwoxpi/pSi5PnjsGKtbDsB1i3CdZvvvGh60BtAagPUJ3boEYlaFgDKlYMruV3vwmH8rcZX908egkpkdem91ZvCTIZ2fIYPjNJvWaUS4H67bxjN+yLh/gjsO8QHIiHoycMiwjlCHDUnPqq+vhJkxPy5YbICMhzi/H3gvkhJr/xZ8nCULoY3Boj4nMzOqwh89r02uFpQaaEel9LHEWF0ETZsVhNjMZy8Elx3yqrIATIUQ0LfwXy2fNURJBC0HFEQzn54jbtiwfdlFXIGO9PMOwVi8dA0YJQzPwzT37vvx/v0lDwqJymmprJEUGGKAtXwdcrUr72mLxQsgiUKGwItlgS0RYpaNh9uJaLsPOA9cGV92M/1B9EkMINqPII6uvb9SnfG+VrW6oolChkrDxfE2tBKGoKN2c+584m/hRnfZsqSydfQevbTQkRZIgSFoBgzl4wNvx/TsVcWaULFo2G3xb7VjLACmYssr7NayXgbVptkUWdECWXRs8eVQhHVVJWZRjs5NJJGPWx9R3Wq2LfRYggQ5R8Nmx0z1lq770d8k7gebQp0biW9W2mhggyRLFjkWLMZ/YV0121Et7SMDoqmt+up92UEEGGKBVtMNM6fgbenai/H1WbpImmWpfKIzfaJvd4RJChS23N1ZMTeXwEzF+gqfHLMHqcURBWx1RV0cfCqtUZQQQZooRlh0bV9V+7WuBpMwAeeRaOH7SmzT9PwNjJULQhDHpdbzVlu60wvXUeUrCU8VOg/1D77qnaaWnbCDo1h1q3Ge+x6Tm0q8PPO/bAb3tg3WZYsib1/VGr6dAEZtkw5U6KCDKEUSNNZE1ISHDuHqhDyjkijQK6iYV+TpyCi5ch/pjxp1OsmQZ169nbuQgyxBn8Irw9NdTvwo2o6fyKGfb3K4IMcU7FQ976+hZFvMqGmXCbAwZrsqgT4ij/mpFPhfpduJ4HuzgjRmSEFK5xBep3htUb5Hbcmgf2LIUsuZzpX0ZI4dr5x7ljjPIGoYxaVFJVpJ0SIyJIIRFV7GflNAgP4U/EjFFQ1Ya92bQQQQp/UakKrJpmeMyGGh+9DJ1cUA9TBClchypi8/NMo8JUKKDOhaoqZH17ueNiRZDCDSiT4y1zoUqQVyIrGWPUJ3VTFTIRpJAi+QtD3BwYEoQ1GBWqrN6ORVC6gguCSYLa9rgA3OSaiATXsXMbDBoOc7/1/rPp1gJGPGlU8HIjSpBHVVFad4YnuIlNG+DNj2DqXGfzX31Fpcje3wmefwiKuFSIJmeUIFUNqRCu8i/4ijqBMW0uTJgB38W69/apIq/3d4F72kNklAsCSp/DSpAqP8Om46pCsKEqkC1eDYtXwapYw4nOqdQvldjQtK5xxOvuJsZ7sMfYqgS5XPn4iFIES7gEW7fDuo2wbRds/g127Yfd++HYaWu6iMpp+MFWLgOVykDFkoYlSYEizvnBWsQK5cv6u6cvQXAXWaBcReMrJS6fgmMnjYI4x0/BufNw4aLxjers46XLEHmz8d85s0N4OGS9CfLkMs5M5swT1G7Cv6tLS8XuVhCsJ3NOyJ/Tk9NJO9ih9iF/Cf7rFARPsEEJUkM1BEEQ/CBWCXIPoKGAlyAIPqA0uCcxdS6VwmSCINjENQ0mCnK+3HVBcJRrdtJqH1KRF/hDytMJgiMos8sCqhp74gh5BFgmz0IQHGGZqcHrjl+JO6cgOMMnib0mTlkVEaqatbJXkYciCLZxHIgBzpNshFT/YHMlA0EIeSYmipFkI6RCpefuMDISBUHQzCWglJkLcI3kFh7qf0ySpyAItjApqRhJYYRUqLTfrUCI2+YKglbUNLUssDdpJymZXKlveE2ehSBo5bXkYiSVEVKRVWWeA0FuBCgIjqCOPFaGawZz15GaDaT6xoHyrARBCwNTEiPp+LIuBsbJ8xAESxlvaitFUpuyJhIJ/ASUk2ciCAGjFktrAmdTayg953L1g51UoV15FoIQEKdNLaUqRjJYSmAL0Nso6ykIgh+o0xy9TC2lSUZre3wFPCpPQhB8RtnU3mtqKF18KbbzIfC8PA9B8IkhwLSM/oCvB5JfBRIkcUAQ0kWNjP8CRvpyq/wpRzfc3EeRd0pBSBn1ztjPVzESQH3I94GOqlqPPBBBuA6liQ7AZH9uSyAFW78Gapt7K4IgGFpQmvjG33sRaAXlLeZG53h5GEKIM97UQrpbG2lhRUlztdHZH2gjhXuEEGSP+dnvn96mf0awQpCJKG/XSuZK7PmM/YggeJbz5me9opW+xunlsvpLYXPPsq/YgQhBxiXzpP+wlM4zBoouQSaihPkYcJ+42Qke5wQwARitQ4iJ6BZkIspisrOZz9dMHNIFj6D2E5eamTYz7HgVs0uQSVFlC1oCrYE7TE9KQXALypt4ufleuDDRUdwunBBkcpT1ZDVzQUhZhhQD8qtS8uZ5TDHbEqzknLkaehSIB3YDv5qFi2OTu8DZCvD/AjTWW/XSzeEAAAAASUVORK5CYII="""
 
 # Словарь программ для завершения: ключ - имя процесса, значение - отображаемое название
 PROGRAMS_TO_TERMINATE: Dict[str, str] = {
@@ -78,7 +69,6 @@ detected_apps_var: Optional[StringVar] = None
 start_button: Optional[Button] = None
 stop_button: Optional[Button] = None
 detected_apps_label: Optional[Label] = None
-temp_icon_path: Optional[str] = None
 autostart_button: Optional[Button] = None
 autostart_status_var: Optional[StringVar] = None
 
@@ -89,42 +79,22 @@ _cache_lock = threading.Lock()  # Блокировка для потокобез
 
 def setup_icon(window) -> None:
     """
-    Устанавливает иконку окна из встроенных данных.
-    Создает временный .ico файл из base64 данных.
+    Устанавливает иконку окна из ресурсов exe файла.
+    Иконка будет использоваться только если приложение упаковано в exe с иконкой.
+    В Windows иконка встроена в exe, поэтому используем путь к самому exe.
     
     Args:
         window: Окно Tkinter (Tk или Toplevel) для установки иконки
     """
-    global temp_icon_path
-    
     try:
-        # Декодируем base64 данные
-        icon_data = base64.b64decode(ICON_BASE64)
-        
-        # Создаем временный файл
-        temp_dir = tempfile.gettempdir()
-        temp_icon_path = os.path.join(temp_dir, "tsg_observer_icon.ico")
-        
-        if PIL_AVAILABLE:
-            # Используем PIL для конвертации PNG в ICO
-            from io import BytesIO
-            img = Image.open(BytesIO(icon_data))
-            img.save(temp_icon_path, format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (32, 32), (16, 16)])
-        else:
-            # Если PIL недоступен, сохраняем как PNG и используем напрямую
-            temp_icon_path = temp_icon_path.replace('.ico', '.png')
-            with open(temp_icon_path, 'wb') as f:
-                f.write(icon_data)
-        
-        # Устанавливаем иконку
-        try:
-            window.iconbitmap(temp_icon_path)
-        except:
-            # Если не получилось установить иконку, игнорируем ошибку
-            pass
-            
+        # Проверяем, запущено ли приложение как exe
+        if getattr(sys, 'frozen', False):
+            # Используем иконку из самого exe файла
+            # В Windows iconbitmap() может принимать путь к exe и извлечет иконку из его ресурсов
+            window.iconbitmap(sys.executable)
     except Exception:
-        # Если что-то пошло не так, просто игнорируем
+        # Если не получилось установить иконку (например, при запуске из скрипта),
+        # просто игнорируем - это нормально
         pass
 
 
